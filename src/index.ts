@@ -8,10 +8,12 @@
  * - 不支持非分层协议 如 `data:` / `mailto:` 等，会抛出异常
  * - 去除 `base` 参数不解析相对路径
  * - `searchParams.set()` 不保留键的原始位置（先删后插）
- * - 不识别 userinfo（`user@host` 会被当作 host 的一部分）
+ * - userinfo 原样保留（原生 URL 会对 username / password 做 percent 编解码，reurl 不做）
  */
 export class ReURL {
   declare private _protocol: string // 协议（含结尾冒号），如 "https:"
+  declare username: string // userinfo 用户名
+  declare password: string // userinfo 密码
   declare private _host: string // 主机部分，如 "example.com:8080"
   declare private _hostname: string
   declare private _port: string
@@ -25,7 +27,17 @@ export class ReURL {
   }
 
   get href(): string {
-    return this._protocol + '//' + this._host + this._pathname + this._search + this._hash
+    const { username, password } = this
+
+    return (
+      this._protocol +
+      '//' +
+      (username || password ? username + prefix(':', password) + '@' : '') +
+      this._host +
+      this._pathname +
+      this._search +
+      this._hash
+    )
   }
 
   set href(value: string) {
@@ -74,6 +86,15 @@ export class ReURL {
   }
 
   set host(value: string) {
+    const at = value.lastIndexOf('@')
+    if (~at) {
+      // 拆分 userinfo（最后一个 @ 之前），不做任何解码
+      const userinfo = value.slice(0, at)
+      const [username, password = ''] = userinfo.split(':')
+      this.username = username
+      this.password = password
+      value = value.slice(at + 1)
+    } else this.username = this.password = ''
     this._host = value
     const j = value.indexOf(':', value.lastIndexOf(']') + 1)
     if (~j) {

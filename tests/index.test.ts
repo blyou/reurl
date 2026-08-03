@@ -32,6 +32,81 @@ describe('ReURL', () => {
     expect(() => new ReURL('mailto:a@b.c')).toThrow(TypeError)
   })
 
+  describe('userinfo', () => {
+    test('解析 username / password', () => {
+      const u = new ReURL('https://user:pass@example.com:8080/p?x#h')
+      expect(u.username).toBe('user')
+      expect(u.password).toBe('pass')
+      expect(u.host).toBe('example.com:8080')
+      expect(u.hostname).toBe('example.com')
+      expect(u.port).toBe('8080')
+      expect(u.origin).toBe('https://example.com:8080') // origin 不含 userinfo
+      expect(u.href).toBe('https://user:pass@example.com:8080/p?x#h')
+    })
+
+    test('仅 username', () => {
+      const u = new ReURL('https://user@example.com/')
+      expect(u.username).toBe('user')
+      expect(u.password).toBe('')
+      expect(u.href).toBe('https://user@example.com/')
+    })
+
+    test('password 含 @ 时按最后一个 @ 拆分', () => {
+      const u = new ReURL('https://user:p@ss@example.com/')
+      expect(u.username).toBe('user')
+      expect(u.password).toBe('p@ss')
+      expect(u.host).toBe('example.com')
+    })
+
+    test('userinfo 原样保留不编解码', () => {
+      const u = new ReURL('https://us er:p%40ss@example.com/')
+      expect(u.username).toBe('us er')
+      expect(u.password).toBe('p%40ss')
+      expect(u.href).toBe('https://us er:p%40ss@example.com/')
+    })
+
+    test('setter 联动 href', () => {
+      const u = new ReURL('https://example.com/')
+      expect(u.username).toBe('')
+      expect(u.password).toBe('')
+      u.username = 'a'
+      expect(u.href).toBe('https://a@example.com/')
+      u.password = 'b'
+      expect(u.href).toBe('https://a:b@example.com/')
+      u.username = 'c'
+      expect(u.href).toBe('https://c:b@example.com/')
+      u.password = ''
+      expect(u.href).toBe('https://c@example.com/')
+      u.password = 'd'
+      expect(u.href).toBe('https://c:d@example.com/')
+      u.username = ''
+      expect(u.href).toBe('https://:d@example.com/')
+      u.password = ''
+      expect(u.href).toBe('https://example.com/')
+    })
+
+    test('host setter 识别 userinfo', () => {
+      const u = new ReURL('https://example.com/')
+      u.host = 'u:p@h.com:1'
+      expect(u.username).toBe('u')
+      expect(u.password).toBe('p')
+      expect(u.hostname).toBe('h.com')
+      expect(u.port).toBe('1')
+      expect(u.href).toBe('https://u:p@h.com:1/')
+      u.host = 'x.com'
+      expect(u.username).toBe('')
+      expect(u.password).toBe('')
+    })
+
+    test('href 重设后清空 userinfo', () => {
+      const u = new ReURL('https://user:pass@a.com/')
+      u.href = 'https://b.com/'
+      expect(u.username).toBe('')
+      expect(u.password).toBe('')
+      expect(u.href).toBe('https://b.com/')
+    })
+  })
+
   describe('IPv6 host', () => {
     test('带端口', () => {
       const u = new ReURL('http://[2001:db8::1]:8080/p?x#h')

@@ -43,6 +43,18 @@ u.port = '9090' // host → 'b.com:9090'
 u.pathname = '/new' // href 同步更新
 ```
 
+#### userinfo（username / password）
+
+```ts
+const u2 = new ReURL('https://user:pass@a.com/')
+
+u2.username // 'user'
+u2.password // 'pass'
+u2.password = 'new' // href → 'https://user:new@a.com/'
+u2.username = ''
+u2.password = '' // href → 'https://a.com/'（userinfo 整体移除）
+```
+
 #### searchParams 双向联动
 
 ```ts
@@ -103,7 +115,7 @@ new ReSearchParams(new ReSearchParams('a=1'))
 | 非分层协议           | `data:` / `mailto:` 等可解析 | **不支持**，直接抛出 `TypeError`               |
 | 相对路径             | `new URL('/p', base)` 可解析 | **不支持** `base` 参数（相对路径视为不可解析） |
 | `searchParams.set()` | 保留键的原始位置             | 先删后插，位置移到末尾                         |
-| userinfo             | `user@host` 拆分             | 不识别，整体当作 host 的一部分                 |
+| userinfo             | 拆分且 percent 编解码        | 拆分 username / password，但原样保留不编解码   |
 
 ## 开发
 
