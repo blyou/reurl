@@ -154,7 +154,12 @@ export class ReURL {
   }
 
   get searchParams(): ReSearchParams {
-    return (this._searchParams ??= new ReSearchParams(this as any))
+    if (!this._searchParams) {
+      this._searchParams = new ReSearchParams(this._search)
+      // @ts-expect-error 内部允许调用私有属性
+      this._searchParams._url = this
+    }
+    return this._searchParams
   }
 
   toString(): string {
@@ -172,11 +177,6 @@ export class ReSearchParams {
   declare private _url?: ReURL // 绑定的 URL（内部使用）
 
   constructor(init?: string | string[][] | Record<string, string> | ReSearchParams) {
-    if (init instanceof ReURL) {
-      this._url = init
-      // @ts-expect-error 内部允许调用私有属性
-      init = init._search
-    }
     if (init instanceof ReSearchParams) init = [...init]
     if (typeof init == 'string') this._parse(init)
     else if (init != null)
@@ -241,8 +241,8 @@ export class ReSearchParams {
   }
 
   /** 仅拼接，不做任何编码 */
-  toString(): string {
-    return this._list.map(entry => entry.join('=')).join('&')
+  toString(pre?: string): string {
+    return prefix(pre, this._list.map(entry => entry.join('=')).join('&'))
   }
 
   *entries(): IterableIterator<[string, string]> {
@@ -265,5 +265,5 @@ export class ReSearchParams {
 /** scheme：字母开头 + 字母/数字/+/-/.，以冒号结尾 */
 const SCHEME_RE = /^[a-zA-Z][a-zA-Z\d+.-]*:/
 
-const prefix = (prefix: string, value: string) =>
-  value && value[0] != prefix ? prefix + value : value
+const prefix = (prefix: string | undefined | null, value: string) =>
+  value && prefix && value[0] != prefix ? prefix + value : value
