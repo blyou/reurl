@@ -10,6 +10,14 @@
  * - `searchParams.set()` 不保留键的原始位置（先删后插）
  * - userinfo 原样保留（原生 URL 会对 username / password 做 percent 编解码，reurl 不做）
  */
+
+/** scheme：字母开头 + 字母/数字/+/-/.，以冒号结尾 */
+const SCHEME_RE = /^[a-zA-Z][a-zA-Z\d+.-]*:/
+
+/** 前缀拼接，确保前缀不重复出现 */
+export const prefix = (prefix: string | undefined | null, value: string) =>
+  prefix && value && value[0] != prefix ? prefix + value : value
+
 export class ReURL {
   declare private _protocol: string // 协议（含结尾冒号），如 "https:"
   declare username: string // userinfo 用户名
@@ -174,7 +182,7 @@ export class ReURL {
 export class ReSearchParams {
   /** 键值对列表：第二项为含前导 = 的原始片段（无 = 时为空串） */
   private _list: [string, string][] = []
-  declare private _url?: ReURL // 绑定的 URL（内部使用）
+  declare private _url?: ReURL | RePath // 绑定的 URL / Path（内部使用）
 
   constructor(init?: string | string[][] | Record<string, string> | ReSearchParams) {
     if (init instanceof ReSearchParams) init = [...init]
@@ -262,8 +270,81 @@ export class ReSearchParams {
   }
 }
 
-/** scheme：字母开头 + 字母/数字/+/-/.，以冒号结尾 */
-const SCHEME_RE = /^[a-zA-Z][a-zA-Z\d+.-]*:/
+export class RePath {
+  declare private _pathname: string // 路径，如 "/a/b"
+  declare private _search: string // 查询串（含 ?）
+  declare private _hash: string // hash（含 #）
+  declare private _searchParams?: ReSearchParams // searchParams 缓存
 
-const prefix = (prefix: string | undefined | null, value: string) =>
-  value && prefix && value[0] != prefix ? prefix + value : value
+  /**
+   * @param path 合法的路径查询串，如 `/a/b/c?x=1&y=2#frag`
+   */
+  constructor(path: string | RePath) {
+    this.href = path as string
+  }
+
+  get href(): string {
+    return this._pathname + this._search + this._hash
+  }
+
+  set href(value: string) {
+    let path = '' + value
+    let i = path.indexOf('#')
+    if (~i) {
+      this._hash = path.slice(i)
+      path = path.slice(0, i)
+    } else this._hash = ''
+    i = path.indexOf('?')
+    if (~i) {
+      this._search = path.slice(i)
+      path = path.slice(0, i)
+    } else this._search = ''
+    this.pathname = path
+    // href 被整体重写后，同步已缓存的 searchParams
+    // @ts-expect-error 内部允许调用私有属性
+    this._searchParams?._parse(this._search)
+  }
+
+  get pathname(): string {
+    return this._pathname
+  }
+
+  set pathname(value: string) {
+    this._pathname = prefix('/', value) || '/'
+  }
+
+  get search(): string {
+    return this._search
+  }
+
+  set search(value: string) {
+    this._search = prefix('?', value)
+    // @ts-expect-error 内部允许调用私有属性
+    this._searchParams?._parse(this._search)
+  }
+
+  get hash(): string {
+    return this._hash
+  }
+
+  set hash(value: string) {
+    this._hash = prefix('#', value)
+  }
+
+  get searchParams(): ReSearchParams {
+    if (!this._searchParams) {
+      this._searchParams = new ReSearchParams(this._search)
+      // @ts-expect-error 内部允许调用私有属性
+      this._searchParams._url = this
+    }
+    return this._searchParams
+  }
+
+  toString(): string {
+    return this.href
+  }
+
+  toJSON(): string {
+    return this.href
+  }
+}

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 // import { ReURL, ReSearchParams } from '../src'
-import { ReURL, ReSearchParams } from '../dist/index.mjs'
+import { ReURL, ReSearchParams, RePath } from '../dist/index.mjs'
 
 describe('ReURL', () => {
   test('基础解析', () => {
@@ -214,6 +214,106 @@ describe('ReURL', () => {
     u.search = 'k=中 文'
     expect(sp.get('k')).toBe('中 文')
     expect(sp.has('a')).toBe(false)
+  })
+})
+
+describe('RePath', () => {
+  test('基础解析', () => {
+    const p = new RePath('/a/b/c?x=1&y=2#frag')
+    expect(p.pathname).toBe('/a/b/c')
+    expect(p.search).toBe('?x=1&y=2')
+    expect(p.hash).toBe('#frag')
+    expect(p.href).toBe('/a/b/c?x=1&y=2#frag')
+    expect(p.toString()).toBe(p.href)
+    expect(p.toJSON()).toBe(p.href)
+  })
+
+  test('无查询参数、无 hash', () => {
+    const p = new RePath('/a/b')
+    expect(p.pathname).toBe('/a/b')
+    expect(p.search).toBe('')
+    expect(p.hash).toBe('')
+    expect(p.href).toBe('/a/b')
+  })
+
+  test('仅查询参数', () => {
+    const p = new RePath('/p?x=1')
+    expect(p.pathname).toBe('/p')
+    expect(p.search).toBe('?x=1')
+    expect(p.hash).toBe('')
+  })
+
+  test('仅 hash', () => {
+    const p = new RePath('/p#top')
+    expect(p.pathname).toBe('/p')
+    expect(p.search).toBe('')
+    expect(p.hash).toBe('#top')
+  })
+
+  test('空路径', () => {
+    const p = new RePath('')
+    expect(p.pathname).toBe('/')
+    expect(p.search).toBe('')
+    expect(p.hash).toBe('')
+    expect(p.href).toBe('/')
+  })
+
+  test('仅查询串 / 仅 hash 时空路径补 /', () => {
+    expect(new RePath('?x=1').href).toBe('/?x=1')
+    expect(new RePath('#top').href).toBe('/#top')
+  })
+
+  test('缺少前导 / 时补齐', () => {
+    const p = new RePath('a/b?x=1')
+    expect(p.pathname).toBe('/a/b')
+    expect(p.href).toBe('/a/b?x=1')
+  })
+
+  test('原样保留：不编码、不规范化', () => {
+    const path = '/a/../b/./中 文?键=值&x=%20#锚 点'
+    const p = new RePath(path)
+    expect(p.href).toBe(path)
+    expect(p.pathname).toBe('/a/../b/./中 文')
+    expect(p.search).toBe('?键=值&x=%20')
+    expect(p.hash).toBe('#锚 点')
+  })
+
+  test('searchParams 双向联动', () => {
+    const p = new RePath('/a?x=1&y=2')
+    const sp = p.searchParams
+    expect(p.searchParams).toBe(sp) // 缓存同一对象
+    expect(sp.get('x')).toBe('1')
+    expect(sp.get('y')).toBe('2')
+    sp.append('z', '3')
+    expect(p.href).toBe('/a?x=1&y=2&z=3')
+    sp.delete('x')
+    expect(p.search).toBe('?y=2&z=3')
+    p.search = 'k=中 文'
+    expect(sp.get('k')).toBe('中 文')
+    expect(sp.has('x')).toBe(false)
+    p.href = '/b?m=1#h'
+    expect(sp.get('m')).toBe('1')
+  })
+
+  test('setter 联动 href', () => {
+    const p = new RePath('/a?x=1#f')
+    p.pathname = '/b'
+    expect(p.href).toBe('/b?x=1#f')
+    p.pathname = ''
+    expect(p.pathname).toBe('/')
+    expect(p.href).toBe('/?x=1#f')
+    p.pathname = 'c'
+    expect(p.href).toBe('/c?x=1#f')
+    p.search = '?y=2'
+    expect(p.search).toBe('?y=2')
+    p.search = 'z=3'
+    expect(p.search).toBe('?z=3')
+    p.search = ''
+    expect(p.href).toBe('/c#f')
+    p.hash = 'top'
+    expect(p.hash).toBe('#top')
+    p.hash = ''
+    expect(p.href).toBe('/c')
   })
 })
 
