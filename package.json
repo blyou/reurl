@@ -1,6 +1,6 @@
 {
   "name": "@blyou/reurl",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A tiny zero-dependency URL parser.",
   "keywords": [
     "url",
